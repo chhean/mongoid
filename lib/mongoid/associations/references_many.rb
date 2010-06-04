@@ -26,8 +26,15 @@ module Mongoid #:nodoc:
       # Returns the newly created object.
       def build(attributes = nil)
         load_target
-        name = @parent.class.to_s.underscore
-        object = @klass.instantiate((attributes || {}).merge(name => @parent))
+        
+        if @foreign_type
+          name = @parent.class.to_s.underscore
+          object = @klass.instantiate(attributes.merge(@base.call.selector))
+        else
+          name = @parent.class.to_s.underscore
+          object = @klass.instantiate(attributes.merge(name => @parent))
+        end
+        
         @target << object
         object
       end
@@ -92,7 +99,22 @@ module Mongoid #:nodoc:
       # options: The association +Options+.
       def initialize(document, options, target = nil)
         setup(document, options)
-        @target = target || query.call
+        @parent, @klass, @options = document, options.klass, options
+        
+        @foreign_key = options.foreign_key
+        
+        pre_conditions = { @foreign_key => document.id  }
+        
+        if options.as
+          @foreign_type = options.as.to_s+"_type"
+          
+          pre_conditions[@foreign_type] = document.class.to_s
+        end
+        
+        @base = lambda { @klass.all(:conditions => pre_conditions) }
+        
+        @target = target || @base.call
+        extends(options)
       end
 
       # Override the default behavior to allow the criteria to get reset on

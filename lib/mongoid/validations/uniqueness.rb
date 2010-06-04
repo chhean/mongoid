@@ -12,16 +12,29 @@ module Mongoid #:nodoc:
     #
     #     validates_uniqueness_of :title
     #   end
+    #  
+    #  :in option allows to set external collection to check in
+    #  :field option allows to set custom attribute name
+    #
     class UniquenessValidator < ActiveModel::EachValidator
       def validate_each(document, attribute, value)
-        conditions = {attribute => value}
-        
-        Array.wrap(options[:scope]).each do |item|
-          conditions[item] = document.attributes[item]
+        if options.has_key? :field
+          conditions = {options[:field] => value}
+        else
+          conditions = {attribute => value}
         end
-        return if document.collection.find_one(conditions).nil?
         
-        if document.new_record? || key_changed?(document)
+        conditions[options[:scope]] = document.attributes[options[:scope]] if options.has_key?(:scope) && !options[:scope].blank?
+        
+        if options.has_key? :in
+          scope = options[:in].classify.constantize
+        else
+          scope = document.class
+        end
+        
+        return if scope.where(conditions).empty?
+        
+        if (document.new_record? || key_changed?(document)) || options.has_key?(:in)
           document.errors.add(attribute, :taken, :default => options[:message], :value => value)
         end
       end

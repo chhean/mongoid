@@ -56,6 +56,34 @@ module Mongoid # :nodoc:
     end
 
     module ClassMethods
+
+      # Adds a relational association from the child Document to a Document in
+      # another database or collection.
+      #
+      # Options:
+      #
+      # name: A +Symbol+ that is the related class name.
+      #
+      # Example:
+      #
+      #   class Game
+      #     include Mongoid::Document
+      #     belongs_to_related :person
+      #   end
+      #
+      def belongs_to_related(name, options = {}, &block)
+        opts = optionize(name, options, fk(name, options), &block)
+        associate(Associations::BelongsToRelated, opts)
+        field(opts.foreign_key, :type => Mongoid.use_object_ids ? BSON::ObjectID : String)
+        index(opts.foreign_key) unless embedded?
+        
+        if options[:polymorphic]
+          field(opts.foreign_type)
+          index(opts.foreign_type)
+        end
+        
+      end
+
       # Gets whether or not the document is embedded.
       #
       # Example:
